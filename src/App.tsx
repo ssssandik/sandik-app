@@ -349,16 +349,21 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route 
-            path="/*" 
-            element={
-              <ProtectedRoute>
-                <MainApp />
-              </ProtectedRoute>
-            } 
-          />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  );
-}
+         <Routes>
+
+  <Route path="/" element={<Landing />} />
+
+  <Route path="/login" element={<Login />} />
+
+  <Route path="/signup" element={<Register />} />
+
+  <Route 
+    path="/dashboard" 
+    element={
+      <ProtectedRoute>
+        <MainApp />
+      </ProtectedRoute>
+    }
+  />
+
+</Routes>
