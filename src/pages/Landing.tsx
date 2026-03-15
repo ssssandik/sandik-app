@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { LogIn } from 'lucide-react';
-import { useAuth } from './AuthProvider';
+import { useAuth } from "../auth/AuthProvider"
 
 export default function Login() {
   const [email, setEmail] = useState('');
