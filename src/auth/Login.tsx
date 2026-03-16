@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { LogIn } from 'lucide-react';
+import { useAuth } from './AuthProvider';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -9,22 +10,49 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
+
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(redirectTo, { replace: true });
+    }
+  }, [user, authLoading, navigate, redirectTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-  setError(error.message);
-  setLoading(false);
-}
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        navigate(redirectTo, { replace: true });
+      }
+    } catch (err: any) {
+      setError('An unexpected error occurred. Please try again.');
+      setLoading(false);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -84,7 +112,7 @@ export default function Login() {
 
         <div className="text-center text-sm text-slate-500">
           Don't have an account?{' '}
-          <Link to="/register" className="text-emerald-600 font-bold hover:underline">
+          <Link to="/signup" className="text-emerald-600 font-bold hover:underline">
             Create one
           </Link>
         </div>

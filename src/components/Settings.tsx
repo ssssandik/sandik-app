@@ -16,11 +16,15 @@ import {
   Lock,
   ChevronRight,
   X,
-  Calendar
+  Calendar,
+  CreditCard,
+  Shield,
+  Smartphone
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Building, Apartment } from '../types';
 import { auditService } from '../services/auditService';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface SettingsProps {
   building: Building | null;
@@ -108,14 +112,12 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
 
       if (error) throw error;
       if (data) {
-        // Log building update
         auditService.logUpdate('building', building.id, building.id, building, data);
         onUpdate(data);
         setActiveModal(null);
       }
     } catch (error: any) {
       console.error('Error updating building:', error);
-      alert('Error updating building: ' + error.message);
     } finally {
       setIsSaving(false);
     }
@@ -127,7 +129,6 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
 
     try {
       if (!selectedApt.id) {
-        // 1. Fetch the building total_apartments from the buildings table to ensure we have the latest data
         const { data: bld, error: bldError } = await supabase
           .from('buildings')
           .select('total_apartments')
@@ -136,7 +137,6 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
         
         if (bldError) throw bldError;
 
-        // 2. Count the current apartments in the apartments table for this building
         const { count, error: countError } = await supabase
           .from('apartments')
           .select('*', { count: 'exact', head: true })
@@ -144,7 +144,6 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
         
         if (countError) throw countError;
 
-        // 3. If current_apartments >= total_apartments, show error and return
         if (count !== null && count >= bld.total_apartments) {
           alert('You exceeded the building apartment limit');
           setIsSaving(false);
@@ -162,18 +161,15 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
       if (selectedApt.id) {
         const { error } = await supabase.from('apartments').update(aptData).eq('id', selectedApt.id);
         if (error) throw error;
-        // Log apartment update
         auditService.logUpdate('apartment', selectedApt.id, building.id, selectedApt, aptData);
       } else {
         const { data: newApt, error } = await supabase.from('apartments').insert([aptData]).select().single();
         if (error) throw error;
-        // Log apartment creation
         if (newApt) {
           auditService.logCreate('apartment', newApt.id, building.id, newApt);
         }
       }
 
-      // Refresh
       const { data, error: fetchError } = await supabase
         .from('apartments')
         .select('*')
@@ -189,11 +185,9 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
         });
         setApartments(sorted);
       }
-      setActiveModal(null);
       setSelectedApt(null);
     } catch (error: any) {
       console.error('Error saving apartment:', error);
-      alert('Error saving apartment: ' + error.message);
     } finally {
       setIsSaving(false);
     }
@@ -203,7 +197,6 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
     if (!confirm('Are you sure you want to delete this apartment?')) return;
     if (!building) return;
 
-    // Fetch apt first for logging
     const { data: aptToDelete } = await supabase.from('apartments').select('*').eq('id', id).single();
     
     const { error } = await supabase.from('apartments').delete().eq('id', id);
@@ -213,273 +206,357 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
     setApartments(apartments.filter(a => a.id !== id));
   };
 
-  const SettingItem = ({ icon: Icon, label, value, onClick }: any) => (
+  const SettingItem = ({ icon: Icon, label, value, onClick, color = "indigo" }: any) => (
     <button 
       onClick={onClick}
-      className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors group"
+      className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all group"
     >
-      <div className="flex items-center gap-4">
-        <div className="p-2 bg-slate-100 rounded-xl text-slate-500 group-hover:text-emerald-500 group-hover:bg-emerald-50 transition-all">
-          <Icon size={20} />
+      <div className="flex items-center gap-5">
+        <div className={`p-2.5 bg-slate-100 rounded-2xl text-slate-500 group-hover:text-${color}-500 group-hover:bg-${color}-50 transition-all border border-slate-200 group-hover:border-${color}-100`}>
+          <Icon size={22} />
         </div>
         <div className="text-start">
-          <p className="text-sm font-bold text-slate-900">{label}</p>
-          {value && <p className="text-xs text-slate-400">{value}</p>}
+          <p className="text-sm font-black text-slate-900 tracking-tight">{label}</p>
+          {value && <p className="text-xs font-bold text-slate-400 mt-0.5">{value}</p>}
         </div>
       </div>
-      <ChevronRight size={18} className="text-slate-300" />
+      <div className="p-1.5 rounded-lg bg-slate-50 text-slate-300 group-hover:text-slate-500 group-hover:bg-slate-100 transition-all">
+        <ChevronRight size={18} />
+      </div>
     </button>
   );
 
   return (
-    <div className="space-y-8 max-w-3xl mx-auto">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
-        <p className="text-slate-500">Manage building info and application preferences</p>
+    <div className="space-y-10 max-w-4xl mx-auto pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Settings</h2>
+          <p className="text-slate-500 font-medium">Manage building info and application preferences</p>
+        </div>
       </div>
 
-      <div className="space-y-6">
-        {/* Building Section */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-slate-50/50 border-b border-slate-100">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Building Configuration</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-8">
+          {/* Building Section */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 bg-slate-50/50 border-b border-slate-100">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Building Configuration</h3>
+            </div>
+            <div className="divide-y divide-slate-100">
+              <SettingItem 
+                icon={Building2} 
+                label="Building Info" 
+                value={`${building?.building_name}`}
+                onClick={() => setActiveModal('building')}
+                color="emerald"
+              />
+              <SettingItem 
+                icon={Hash} 
+                label="Apartment Management" 
+                value={`${apartments.length} Units Registered`}
+                onClick={() => setActiveModal('apartment')}
+                color="indigo"
+              />
+            </div>
           </div>
-          <div className="divide-y divide-slate-100">
-            <SettingItem 
-              icon={Building2} 
-              label="Building Info" 
-              value={`${building?.building_name} • ${building?.building_address}`}
-              onClick={() => setActiveModal('building')}
-            />
-            <SettingItem 
-              icon={Hash} 
-              label="Apartment Management" 
-              value={`${apartments.length} Apartments Registered`}
-              onClick={() => setActiveModal('apartment')}
-            />
+
+          {/* App Section */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 bg-slate-50/50 border-b border-slate-100">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Application Settings</h3>
+            </div>
+            <div className="divide-y divide-slate-100">
+              <SettingItem 
+                icon={Calendar} 
+                label="Current Year" 
+                value="2026"
+                onClick={() => {}}
+                color="amber"
+              />
+              <SettingItem 
+                icon={Bell} 
+                label="Notifications" 
+                value="Payment Reminders Enabled"
+                onClick={() => {}}
+                color="rose"
+              />
+              <SettingItem 
+                icon={Coins} 
+                label="Currency" 
+                value="MAD (Moroccan Dirham)"
+                onClick={() => {}}
+                color="emerald"
+              />
+            </div>
           </div>
         </div>
 
-        {/* App Section */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-slate-50/50 border-b border-slate-100">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Application Settings</h3>
+        <div className="space-y-8">
+          {/* Account Section */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 bg-slate-50/50 border-b border-slate-100">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Account & Security</h3>
+            </div>
+            <div className="divide-y divide-slate-100">
+              <SettingItem 
+                icon={User} 
+                label="Profile Information" 
+                value="Syndic Manager"
+                onClick={() => {}}
+                color="blue"
+              />
+              <SettingItem 
+                icon={Shield} 
+                label="Security" 
+                value="Two-Factor Authentication"
+                onClick={() => {}}
+                color="violet"
+              />
+              <SettingItem 
+                icon={Lock} 
+                label="Password" 
+                value="Last changed 3 months ago"
+                onClick={() => {}}
+                color="slate"
+              />
+            </div>
           </div>
-          <div className="divide-y divide-slate-100">
-            <SettingItem 
-              icon={Calendar} 
-              label="Current Year" 
-              value="2026"
-              onClick={() => {}}
-            />
-            <SettingItem 
-              icon={Bell} 
-              label="Payment Reminders" 
-              value="Enabled"
-              onClick={() => {}}
-            />
-            <SettingItem 
-              icon={Coins} 
-              label="Currency" 
-              value="MAD (Moroccan Dirham)"
-              onClick={() => {}}
-            />
-          </div>
-        </div>
 
-        {/* Account Section */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-slate-50/50 border-b border-slate-100">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Account & Security</h3>
-          </div>
-          <div className="divide-y divide-slate-100">
-            <SettingItem 
-              icon={User} 
-              label="Profile Information" 
-              value="Syndic Manager"
-              onClick={() => {}}
-            />
-            <SettingItem 
-              icon={Lock} 
-              label="Security" 
-              value="Change Password"
-              onClick={() => {}}
-            />
+          {/* Help Section */}
+          <div className="bg-indigo-600 rounded-3xl p-8 text-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+              <Globe size={120} />
+            </div>
+            <h3 className="text-xl font-bold mb-2">Need help?</h3>
+            <p className="text-indigo-100 text-sm font-medium mb-6 leading-relaxed">Check our documentation or contact support for any questions regarding Sandik.</p>
+            <button className="px-6 py-2.5 bg-white text-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-50 transition-all shadow-lg shadow-indigo-900/20">
+              Visit Help Center
+            </button>
           </div>
         </div>
       </div>
 
       {/* Building Modal */}
-      {activeModal === 'building' && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setActiveModal(null)} />
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-bold text-xl text-slate-900">Edit Building Info</h3>
-              <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Building Name</label>
-                <input 
-                  type="text" 
-                  value={buildingForm.name}
-                  onChange={(e) => setBuildingForm({...buildingForm, name: e.target.value})}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
+      <AnimatePresence>
+        {activeModal === 'building' && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+              onClick={() => setActiveModal(null)} 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <Building2 size={20} />
+                  </div>
+                  <h3 className="font-black text-xl text-slate-900 tracking-tight">Building Info</h3>
+                </div>
+                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Address</label>
-                <input 
-                  type="text" 
-                  value={buildingForm.address}
-                  onChange={(e) => setBuildingForm({...buildingForm, address: e.target.value})}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Units</label>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Building Name</label>
                   <input 
-                    type="number" 
-                    value={buildingForm.total}
-                    onChange={(e) => setBuildingForm({...buildingForm, total: Number(e.target.value)})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    type="text" 
+                    value={buildingForm.name}
+                    onChange={(e) => setBuildingForm({...buildingForm, name: e.target.value})}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Monthly Fee (MAD)</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Address</label>
                   <input 
-                    type="number" 
-                    value={buildingForm.contribution}
-                    onChange={(e) => setBuildingForm({...buildingForm, contribution: Number(e.target.value)})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    type="text" 
+                    value={buildingForm.address}
+                    onChange={(e) => setBuildingForm({...buildingForm, address: e.target.value})}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Units</label>
+                    <input 
+                      type="number" 
+                      value={buildingForm.total}
+                      onChange={(e) => setBuildingForm({...buildingForm, total: Number(e.target.value)})}
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monthly Fee</label>
+                    <input 
+                      type="number" 
+                      value={buildingForm.contribution}
+                      onChange={(e) => setBuildingForm({...buildingForm, contribution: Number(e.target.value)})}
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="p-6 bg-slate-50/50 border-t border-slate-100">
-              <button 
-                onClick={handleUpdateBuilding}
-                disabled={isSaving}
-                className={`w-full py-3 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isSaving ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Save size={18} />
-                )}
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
+              <div className="p-8 bg-slate-50/50 border-t border-slate-100">
+                <button 
+                  onClick={handleUpdateBuilding}
+                  disabled={isSaving}
+                  className={`w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3 active:scale-[0.98] ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isSaving ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save size={20} />
+                  )}
+                  {isSaving ? 'Saving Changes...' : 'Save Changes'}
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Apartment Management Modal */}
-      {activeModal === 'apartment' && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setActiveModal(null)} />
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-bold text-xl text-slate-900">Manage Apartments</h3>
-              <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto flex-1">
-              <button 
-                onClick={() => setSelectedApt({ apartment_number: '', owner_name: '', phone: '' })}
-                className="w-full mb-6 py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold hover:border-emerald-500 hover:text-emerald-500 transition-all flex items-center justify-center gap-2"
-              >
-                <Plus size={20} />
-                Add New Apartment
-              </button>
-
-              {selectedApt && (
-                <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4 animate-in slide-in-from-top-4 duration-200">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Apt #</label>
-                      <input 
-                        type="text" 
-                        value={selectedApt.apartment_number}
-                        onChange={(e) => setSelectedApt({...selectedApt, apartment_number: e.target.value})}
-                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Owner</label>
-                      <input 
-                        type="text" 
-                        value={selectedApt.owner_name}
-                        onChange={(e) => setSelectedApt({...selectedApt, owner_name: e.target.value})}
-                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Phone</label>
-                      <input 
-                        type="text" 
-                        value={selectedApt.phone}
-                        onChange={(e) => setSelectedApt({...selectedApt, phone: e.target.value})}
-                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      />
-                    </div>
+      <AnimatePresence>
+        {activeModal === 'apartment' && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+              onClick={() => setActiveModal(null)} 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <Hash size={20} />
                   </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setSelectedApt(null)}
-                      className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={handleSaveApt}
-                      className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-100"
-                    >
-                      Save Apartment
-                    </button>
-                  </div>
+                  <h3 className="font-black text-xl text-slate-900 tracking-tight">Manage Apartments</h3>
                 </div>
-              )}
-
-              <div className="space-y-2">
-                {apartments.map((apt) => (
-                  <div key={apt.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:border-slate-200 transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-700">
-                        {apt.apartment_number}
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900">{apt.owner_name}</p>
-                        <p className="text-xs text-slate-400 font-mono">{apt.phone}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button 
-                        onClick={() => setSelectedApt(apt)}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteApt(apt.id)}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
               </div>
-            </div>
+              
+              <div className="p-8 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-slate-200">
+                <button 
+                  onClick={() => setSelectedApt({ apartment_number: '', owner_name: '', phone: '' })}
+                  className="w-full mb-8 py-5 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 font-black hover:border-indigo-500 hover:text-indigo-500 hover:bg-indigo-50/30 transition-all flex items-center justify-center gap-3 group"
+                >
+                  <div className="p-1 bg-slate-100 rounded-lg group-hover:bg-indigo-100 transition-colors">
+                    <Plus size={20} />
+                  </div>
+                  Add New Apartment
+                </button>
+
+                <AnimatePresence>
+                  {selectedApt && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="mb-10 p-8 bg-slate-50 rounded-[32px] border border-slate-200 space-y-6 shadow-inner"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Apt #</label>
+                          <input 
+                            type="text" 
+                            value={selectedApt.apartment_number}
+                            onChange={(e) => setSelectedApt({...selectedApt, apartment_number: e.target.value})}
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Owner Name</label>
+                          <input 
+                            type="text" 
+                            value={selectedApt.owner_name}
+                            onChange={(e) => setSelectedApt({...selectedApt, owner_name: e.target.value})}
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone Number</label>
+                          <input 
+                            type="text" 
+                            value={selectedApt.phone}
+                            onChange={(e) => setSelectedApt({...selectedApt, phone: e.target.value})}
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-3 pt-2">
+                        <button 
+                          onClick={() => setSelectedApt(null)}
+                          className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all active:scale-95"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          onClick={handleSaveApt}
+                          disabled={isSaving}
+                          className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                        >
+                          {isSaving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                          {selectedApt.id ? 'Update Apartment' : 'Save Apartment'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {apartments.map((apt) => (
+                    <div key={apt.id} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-3xl hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-500/5 transition-all group">
+                      <div className="flex items-center gap-5">
+                        <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-slate-700 border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all">
+                          {apt.apartment_number}
+                        </div>
+                        <div className="flex flex-col">
+                          <p className="font-black text-slate-900 tracking-tight">{apt.owner_name}</p>
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <Phone size={10} />
+                            <span className="text-[10px] font-bold font-mono">{apt.phone}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setSelectedApt(apt)}
+                          className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all active:scale-90"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteApt(apt.id)}
+                          className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all active:scale-90"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }
