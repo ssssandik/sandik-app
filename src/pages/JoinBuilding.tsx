@@ -27,9 +27,12 @@ export default function JoinBuilding() {
       // In a real app, we'd search by a dedicated invite_code column.
       // For now, we'll try to search by ID as a fallback.
       const { data, error: searchError } = await supabase
-        .from('buildings')
-        .select('*')
-        .eq('id', inviteCode)
+        .from('apartments')
+.select(`
+  *,
+  buildings (*)
+`)
+.eq('invite_code', inviteCode)
         .maybeSingle();
 
       if (searchError) throw searchError;
