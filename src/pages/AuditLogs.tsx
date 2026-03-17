@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Building, AuditLog } from '../types';
-import { motion, AnimatePresence } from 'motion/react';
+// import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuditLogsProps {
   building: Building | null;
@@ -322,24 +322,21 @@ export default function AuditLogs({ building }: AuditLogsProps) {
                         {getActionBadge(log.action_type)}
                       </td>
                     </tr>
-                    <AnimatePresence>
+                    <div>
                       {expandedRow === log.id && (
                         <tr>
                           <td colSpan={5} className="p-0 border-none">
-                            <motion.div 
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
+                            <div 
                               className="overflow-hidden bg-slate-50/50"
                             >
                               <div className="p-8 border-t border-slate-100">
                                 {renderDiff(log.old_data, log.new_data)}
                               </div>
-                            </motion.div>
+                            </div>
                           </td>
                         </tr>
                       )}
-                    </AnimatePresence>
+                    </div>
                   </React.Fragment>
                 ))
               )}

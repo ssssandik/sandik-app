@@ -14,7 +14,7 @@ import {
   Bell,
   Search
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+// import { motion, AnimatePresence } from 'framer-motion';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import Apartments from './components/Apartments';
@@ -31,9 +31,16 @@ import Register from './auth/Register';
 import Landing from './pages/Landing';
 import CreateBuilding from './pages/CreateBuilding';
 import JoinBuilding from './pages/JoinBuilding';
+import UserDashboard from './pages/user/Dashboard';
+import UserPayments from './pages/user/Payments';
+import UserProfile from './pages/user/Profile';
+import UserBuilding from './pages/user/Building';
+import UserNotifications from './pages/user/Notifications';
+import UserLayout from './components/user/UserLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import { auditService } from './services/auditService';
 
-type Page = 'dashboard' | 'apartments' | 'contributions' | 'reports' | 'settings' | 'audit';
+type Page = 'dashboard' | 'apartments' | 'contributions' | 'reports' | 'settings' | 'audit' | 'admin-dashboard';
 
 function MainApp() {
   const { signOut, user } = useAuth();
@@ -53,24 +60,33 @@ function MainApp() {
 
   useEffect(() => {
     async function fetchBuilding() {
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       
-      const { data, error } = await supabase
-        .from('buildings')
-        .select('*')
-        .eq('owner_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      
-      if (data) setBuilding(data);
-      setLoading(false);
+      try {
+        const { data, error } = await supabase
+          .from('buildings')
+          .select('*')
+          .eq('owner_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        
+        if (error) throw error;
+        if (data) setBuilding(data);
+      } catch (err) {
+        console.error('Error fetching building:', err);
+      } finally {
+        setLoading(false);
+      }
     }
     fetchBuilding();
   }, [user]);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'apartments', label: 'Apartments', icon: Building2 },
+    { id: 'admin-dashboard', label: 'Apartments', icon: Building2 },
     { id: 'contributions', label: 'Contributions', icon: TableProperties },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'audit', label: 'Audit Logs', icon: History },
@@ -88,11 +104,9 @@ function MainApp() {
   if (!building) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-slate-200 p-10 text-center space-y-8"
-        >
+      <div 
+        className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-slate-200 p-10 text-center space-y-8"
+      >
           <div className="w-24 h-24 bg-emerald-500 rounded-3xl flex items-center justify-center text-white font-black text-5xl mx-auto shadow-2xl shadow-emerald-200 rotate-3 hover:rotate-0 transition-transform duration-500">S</div>
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">Welcome to Sandik</h1>
@@ -111,23 +125,17 @@ function MainApp() {
           >
             Sign Out
           </button>
-        </motion.div>
+        </div>
 
         {/* Create Building Modal */}
-        <AnimatePresence>
+        <div>
           {isCreateModalOpen && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+              <div 
                 className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
                 onClick={() => setIsCreateModalOpen(false)} 
               />
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              <div 
                 className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
               >
                 <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -217,10 +225,10 @@ function MainApp() {
                     {isSaving ? 'Setting up...' : 'Start Managing'}
                   </button>
                 </div>
-              </motion.div>
+              </div>
             </div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
     );
   }
@@ -231,9 +239,10 @@ function MainApp() {
         <Dashboard 
           building={building} 
           onAddPayment={() => setCurrentPage('contributions')}
-          onViewApartments={() => setCurrentPage('apartments')}
+          onViewApartments={() => setCurrentPage('admin-dashboard')}
         />
       );
+      case 'admin-dashboard': return <AdminDashboard />;
       case 'apartments': return (
         <Apartments 
           building={building} 
@@ -359,34 +368,45 @@ function MainApp() {
       {/* Main Content */}
       <main className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-slate-200">
         <div className="max-w-7xl mx-auto p-6 md:p-10">
-          <AnimatePresence mode="wait">
-            <motion.div
+          <div>
+            <div
               key={currentPage}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             >
               {renderPage()}
-            </motion.div>
-          </AnimatePresence>
+            </div>
+          </div>
         </div>
       </main>
 
       {/* Overlay for mobile sidebar */}
-      <AnimatePresence>
+      <div>
         {isSidebarOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <div 
             className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-30 md:hidden"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
-      </AnimatePresence>
+      </div>
     </div>
   );
+}
+
+function DashboardRouter() {
+  const { profile, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (profile?.role === 'owner') {
+    return <Navigate to="/owner-dashboard" replace />;
+  }
+
+  return <MainApp />;
 }
 
 export default function App() {
@@ -399,7 +419,7 @@ export default function App() {
           <Route path="/register" element={<Navigate to="/signup" replace />} />
           <Route path="/signup" element={<Register />} />
           <Route path="/create-building" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="syndic">
               <CreateBuilding />
             </ProtectedRoute>
           } />
@@ -412,7 +432,45 @@ export default function App() {
             path="/dashboard" 
             element={
               <ProtectedRoute>
-                <MainApp />
+                <DashboardRouter />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* User Routes */}
+          <Route path="/payments" element={
+            <ProtectedRoute requiredRole="owner">
+              <UserLayout><UserPayments /></UserLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute requiredRole="owner">
+              <UserLayout><UserProfile /></UserLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/building" element={
+            <ProtectedRoute requiredRole="owner">
+              <UserLayout><UserBuilding /></UserLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute requiredRole="owner">
+              <UserLayout><UserNotifications /></UserLayout>
+            </ProtectedRoute>
+          } />
+          <Route 
+            path="/owner-dashboard" 
+            element={
+              <ProtectedRoute requiredRole="owner">
+                <UserLayout><UserDashboard /></UserLayout>
               </ProtectedRoute>
             } 
           />

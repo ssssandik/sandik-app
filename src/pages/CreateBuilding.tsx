@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, ArrowRight, X, ChevronLeft } from 'lucide-react';
-import { motion } from 'motion/react';
+// import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { auditService } from '../services/auditService';
 
 export default function CreateBuilding() {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
@@ -43,6 +43,15 @@ export default function CreateBuilding() {
       if (error) throw error;
 
       if (data) {
+        // Update user role to 'syndic'
+        const { error: userUpdateError } = await supabase
+          .from('users')
+          .update({ role: 'syndic' })
+          .eq('id', user.id);
+
+        if (userUpdateError) throw userUpdateError;
+
+        await refreshProfile();
         await auditService.logCreate('building', data.id, data.id, data);
         navigate('/dashboard');
       }
@@ -55,9 +64,7 @@ export default function CreateBuilding() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans" dir="rtl">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+      <div 
         className="max-w-xl w-full bg-white rounded-[40px] shadow-2xl border border-slate-200 overflow-hidden"
       >
         <div className="p-10 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
@@ -152,7 +159,7 @@ export default function CreateBuilding() {
             العودة للرئيسية
           </button>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

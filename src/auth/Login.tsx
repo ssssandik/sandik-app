@@ -11,15 +11,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
 
   const redirectTo = searchParams.get('redirect') || '/dashboard';
 
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && profile) {
       navigate(redirectTo, { replace: true });
     }
-  }, [user, authLoading, navigate, redirectTo]);
+  }, [user, profile, authLoading, navigate, redirectTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

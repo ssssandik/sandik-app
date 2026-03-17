@@ -3,7 +3,7 @@ import { Calendar, ChevronLeft, ChevronRight, Save, Trash2, X, Check, AlertCircl
 import { supabase } from '../lib/supabase';
 import { Building, Apartment, Payment, PaymentStatus } from '../types';
 import { auditService } from '../services/auditService';
-import { motion, AnimatePresence } from 'motion/react';
+// import { motion, AnimatePresence } from 'framer-motion';
 
 interface ContributionsProps {
   building: Building | null;
@@ -303,20 +303,14 @@ export default function Contributions({ building }: ContributionsProps) {
         </div>
       </div>
 
-      <AnimatePresence>
+      <div>
         {isModalOpen && selectedCell && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div 
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
               onClick={() => setIsModalOpen(false)} 
             />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            <div 
               className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -405,10 +399,10 @@ export default function Contributions({ building }: ContributionsProps) {
                   {isSaving ? 'Saving...' : 'Save Payment'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </div>
     </div>
   );
 }

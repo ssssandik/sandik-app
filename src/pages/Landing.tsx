@@ -14,7 +14,7 @@ import {
   Smartphone,
   Globe
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+// import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -105,12 +105,9 @@ export default function Landing() {
       </nav>
 
       {/* Mobile Menu */}
-      <AnimatePresence>
+      <div>
         {isMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+          <div 
             className="fixed inset-x-0 top-20 z-40 bg-white border-b border-slate-100 p-6 md:hidden shadow-xl"
           >
             <div className="flex flex-col gap-6">
@@ -123,46 +120,35 @@ export default function Landing() {
                 ابدأ الآن
               </Link>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
 
       {/* Hero Section */}
       <section className="pt-40 pb-20 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-20">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            <div
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full text-xs font-bold mb-6"
             >
               <Zap size={14} />
               <span>المنصة رقم 1 لإدارة السنديك في المغرب</span>
-            </motion.div>
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+            </div>
+            <h1 
               className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight mb-8 leading-[1.1]"
             >
               إدارة العمارات أصبحت <span className="text-blue-600">أسهل</span>
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+            </h1>
+            <p 
               className="text-xl text-slate-500 font-medium leading-relaxed"
             >
               منصة رقمية تساعد السنديك وسكان العمارة على إدارة الشقق والمدفوعات والتواصل بسهولة وشفافية تامة.
-            </motion.p>
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
             {/* Syndic Card */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
+            <div 
               className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-2xl shadow-slate-200/50 flex flex-col items-center text-center group hover:border-blue-500 transition-colors"
             >
               <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
@@ -174,13 +160,10 @@ export default function Landing() {
                 إنشاء عمارة
                 <ChevronLeft size={20} />
               </Link>
-            </motion.div>
+            </div>
 
             {/* Resident Card */}
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
+            <div 
               className="bg-slate-50 p-10 rounded-[40px] border border-slate-200 flex flex-col items-center text-center group hover:border-blue-500 transition-colors"
             >
               <div className="w-20 h-20 bg-white text-blue-600 rounded-3xl flex items-center justify-center mb-8 shadow-sm group-hover:scale-110 transition-transform">
@@ -205,7 +188,7 @@ export default function Landing() {
                   <ChevronLeft size={20} />
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
@@ -220,9 +203,8 @@ export default function Landing() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, i) => (
-              <motion.div 
+              <div 
                 key={i}
-                whileHover={{ y: -10 }}
                 className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all"
               >
                 <div className={`w-14 h-14 ${feature.color} text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg`}>
@@ -230,7 +212,7 @@ export default function Landing() {
                 </div>
                 <h3 className="text-xl font-black text-slate-900 mb-4">{feature.title}</h3>
                 <p className="text-slate-500 font-medium leading-relaxed">{feature.description}</p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>

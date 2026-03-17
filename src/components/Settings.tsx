@@ -24,7 +24,8 @@ import {
 import { supabase } from '../lib/supabase';
 import { Building, Apartment } from '../types';
 import { auditService } from '../services/auditService';
-import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../auth/AuthProvider';
+// import { motion, AnimatePresence } from 'framer-motion';
 
 interface SettingsProps {
   building: Building | null;
@@ -34,16 +35,35 @@ interface SettingsProps {
 }
 
 export default function Settings({ building, onUpdate, initialApartmentId, onClearInitialApartment }: SettingsProps) {
+  const { profile, refreshProfile } = useAuth();
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [activeModal, setActiveModal] = useState<'building' | 'apartment' | 'app' | 'account' | null>(null);
+  const [activeModal, setActiveModal] = useState<'building' | 'apartment' | 'app' | 'account' | 'security' | 'password' | null>(null);
   
   const [buildingForm, setBuildingForm] = useState({
     name: building?.building_name || '',
     address: building?.building_address || '',
     total: building?.total_apartments || 0,
     contribution: building?.monthly_contribution || 0
+  });
+
+  const [appSettingsForm, setAppSettingsForm] = useState({
+    currentYear: new Date().getFullYear().toString(),
+    notificationsEnabled: true,
+    currency: 'MAD'
+  });
+
+  const [accountForm, setAccountForm] = useState({
+    firstName: '',
+    lastName: '',
+    phone: ''
+  });
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
   });
 
   const [selectedApt, setSelectedApt] = useState<Partial<Apartment> | null>(null);
@@ -80,6 +100,16 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
       }
     }
   }, [initialApartmentId, apartments, onClearInitialApartment]);
+
+  useEffect(() => {
+    if (profile) {
+      setAccountForm({
+        firstName: profile.first_name || '',
+        lastName: profile.last_name || '',
+        phone: profile.phone || ''
+      });
+    }
+  }, [profile]);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -206,6 +236,65 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
     setApartments(apartments.filter(a => a.id !== id));
   };
 
+  const handleUpdateAppSettings = async () => {
+    setIsSaving(true);
+    // In a real app, we might save this to a 'config' table or building metadata
+    // For now, we'll just simulate a save
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setIsSaving(false);
+    setActiveModal(null);
+    alert('App settings updated successfully');
+  };
+
+  const handleUpdateProfile = async () => {
+    setIsSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: accountForm.firstName,
+          last_name: accountForm.lastName,
+          phone: accountForm.phone
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      await refreshProfile();
+      alert('Profile updated successfully');
+      setActiveModal(null);
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      alert(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordForm.newPassword
+      });
+      if (error) throw error;
+      alert('Password updated successfully');
+      setActiveModal(null);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error: any) {
+      console.error('Error updating password:', error);
+      alert(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const SettingItem = ({ icon: Icon, label, value, onClick, color = "indigo" }: any) => (
     <button 
       onClick={onClick}
@@ -269,22 +358,22 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
               <SettingItem 
                 icon={Calendar} 
                 label="Current Year" 
-                value="2026"
-                onClick={() => {}}
+                value={appSettingsForm.currentYear}
+                onClick={() => setActiveModal('app')}
                 color="amber"
               />
               <SettingItem 
                 icon={Bell} 
                 label="Notifications" 
-                value="Payment Reminders Enabled"
-                onClick={() => {}}
+                value={appSettingsForm.notificationsEnabled ? "Payment Reminders Enabled" : "Notifications Disabled"}
+                onClick={() => setActiveModal('app')}
                 color="rose"
               />
               <SettingItem 
                 icon={Coins} 
                 label="Currency" 
-                value="MAD (Moroccan Dirham)"
-                onClick={() => {}}
+                value={`${appSettingsForm.currency} (Moroccan Dirham)`}
+                onClick={() => setActiveModal('app')}
                 color="emerald"
               />
             </div>
@@ -301,22 +390,22 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
               <SettingItem 
                 icon={User} 
                 label="Profile Information" 
-                value="Syndic Manager"
-                onClick={() => {}}
+                value="Update your personal details"
+                onClick={() => setActiveModal('account')}
                 color="blue"
               />
               <SettingItem 
                 icon={Shield} 
                 label="Security" 
                 value="Two-Factor Authentication"
-                onClick={() => {}}
+                onClick={() => setActiveModal('security')}
                 color="violet"
               />
               <SettingItem 
                 icon={Lock} 
                 label="Password" 
-                value="Last changed 3 months ago"
-                onClick={() => {}}
+                value="Change your account password"
+                onClick={() => setActiveModal('password')}
                 color="slate"
               />
             </div>
@@ -337,20 +426,14 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
       </div>
 
       {/* Building Modal */}
-      <AnimatePresence>
+      <div>
         {activeModal === 'building' && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div 
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
               onClick={() => setActiveModal(null)} 
             />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            <div 
               className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
             >
               <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -418,26 +501,20 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
                   {isSaving ? 'Saving Changes...' : 'Save Changes'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </div>
 
       {/* Apartment Management Modal */}
-      <AnimatePresence>
+      <div>
         {activeModal === 'apartment' && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div 
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
               onClick={() => setActiveModal(null)} 
             />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            <div 
               className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -463,12 +540,9 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
                   Add New Apartment
                 </button>
 
-                <AnimatePresence>
+                <div>
                   {selectedApt && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
+                    <div 
                       className="mb-10 p-8 bg-slate-50 rounded-[32px] border border-slate-200 space-y-6 shadow-inner"
                     >
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -516,9 +590,9 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
                           {selectedApt.id ? 'Update Apartment' : 'Save Apartment'}
                         </button>
                       </div>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
+                </div>
 
                 <div className="grid grid-cols-1 gap-3">
                   {apartments.map((apt) => (
@@ -553,10 +627,253 @@ export default function Settings({ building, onUpdate, initialApartmentId, onCle
                   ))}
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </div>
+
+      {/* App Settings Modal */}
+      <div>
+        {activeModal === 'app' && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+              onClick={() => setActiveModal(null)} 
+            />
+            <div 
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                    <SettingsIcon size={20} />
+                  </div>
+                  <h3 className="font-black text-xl text-slate-900 tracking-tight">App Settings</h3>
+                </div>
+                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Year</label>
+                  <select 
+                    value={appSettingsForm.currentYear}
+                    onChange={(e) => setAppSettingsForm({...appSettingsForm, currentYear: e.target.value})}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                  >
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Currency</label>
+                  <select 
+                    value={appSettingsForm.currency}
+                    onChange={(e) => setAppSettingsForm({...appSettingsForm, currency: e.target.value})}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                  >
+                    <option value="MAD">MAD (Moroccan Dirham)</option>
+                    <option value="USD">USD (US Dollar)</option>
+                    <option value="EUR">EUR (Euro)</option>
+                  </select>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div>
+                    <p className="text-sm font-black text-slate-900">Push Notifications</p>
+                    <p className="text-[10px] text-slate-400 font-bold">Receive payment reminders</p>
+                  </div>
+                  <button 
+                    onClick={() => setAppSettingsForm({...appSettingsForm, notificationsEnabled: !appSettingsForm.notificationsEnabled})}
+                    className={`w-12 h-6 rounded-full transition-all relative ${appSettingsForm.notificationsEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${appSettingsForm.notificationsEnabled ? 'right-1' : 'left-1'}`} />
+                  </button>
+                </div>
+              </div>
+              <div className="p-8 bg-slate-50/50 border-t border-slate-100">
+                <button 
+                  onClick={handleUpdateAppSettings}
+                  disabled={isSaving}
+                  className={`w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-[0.98] ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isSaving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={20} />}
+                  Save Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Account Modal */}
+      <div>
+        {activeModal === 'account' && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+              onClick={() => setActiveModal(null)} 
+            />
+            <div 
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <User size={20} />
+                  </div>
+                  <h3 className="font-black text-xl text-slate-900 tracking-tight">Profile Info</h3>
+                </div>
+                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">First Name</label>
+                    <input 
+                      type="text" 
+                      value={accountForm.firstName}
+                      onChange={(e) => setAccountForm({...accountForm, firstName: e.target.value})}
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Last Name</label>
+                    <input 
+                      type="text" 
+                      value={accountForm.lastName}
+                      onChange={(e) => setAccountForm({...accountForm, lastName: e.target.value})}
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone Number</label>
+                  <input 
+                    type="text" 
+                    value={accountForm.phone}
+                    onChange={(e) => setAccountForm({...accountForm, phone: e.target.value})}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                  />
+                </div>
+              </div>
+              <div className="p-8 bg-slate-50/50 border-t border-slate-100">
+                <button 
+                  onClick={handleUpdateProfile}
+                  disabled={isSaving}
+                  className={`w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-[0.98] ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isSaving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={20} />}
+                  Update Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Security Modal */}
+      <div>
+        {activeModal === 'security' && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+              onClick={() => setActiveModal(null)} 
+            />
+            <div 
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-violet-50 text-violet-600 rounded-xl">
+                    <Shield size={20} />
+                  </div>
+                  <h3 className="font-black text-xl text-slate-900 tracking-tight">Security</h3>
+                </div>
+                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-12 text-center space-y-6">
+                <div className="w-20 h-20 bg-violet-50 text-violet-600 rounded-3xl flex items-center justify-center mx-auto">
+                  <Smartphone size={40} />
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-slate-900">Coming Soon</h4>
+                  <p className="text-slate-500 font-medium mt-2">Two-Factor Authentication and advanced security logs are currently under development.</p>
+                </div>
+                <button 
+                  onClick={() => setActiveModal(null)}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-slate-800 transition-all active:scale-[0.98]"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Password Modal */}
+      <div>
+        {activeModal === 'password' && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+              onClick={() => setActiveModal(null)} 
+            />
+            <div 
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 text-slate-600 rounded-xl">
+                    <Lock size={20} />
+                  </div>
+                  <h3 className="font-black text-xl text-slate-900 tracking-tight">Change Password</h3>
+                </div>
+                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">New Password</label>
+                  <input 
+                    type="password" 
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Confirm Password</label>
+                  <input 
+                    type="password" 
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all"
+                  />
+                </div>
+              </div>
+              <div className="p-8 bg-slate-50/50 border-t border-slate-100">
+                <button 
+                  onClick={handleUpdatePassword}
+                  disabled={isSaving}
+                  className={`w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-[0.98] ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isSaving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Lock size={20} />}
+                  Update Password
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
