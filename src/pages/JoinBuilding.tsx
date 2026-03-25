@@ -1,54 +1,52 @@
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, X, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 
 export default function JoinBuilding() {
-  const { user, refreshProfile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
-  const [inviteCode, setInviteCode] = useState(searchParams.get('code') || '');
-  const [isSearching, setIsSearching] = useState(false);
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
   const [apartment, setApartment] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  // 🔍 SEARCH
-  const handleSearch = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inviteCode) return;
+  // SEARCH
+  const handleSearch = async () => {
+    if (!code) return;
 
-    setIsSearching(true);
-    setError(null);
+    setLoading(true);
+    setError('');
     setApartment(null);
 
     try {
       const { data, error } = await supabase
         .from('apartments')
         .select('*')
-        .eq('invite_code', inviteCode.trim())
+        .eq('invite_code', code.trim())
         .single();
 
-      if (error) throw error;
-
-      setApartment(data);
-    } catch (err) {
-      console.error(err);
-      setError('Invalid code or no data found');
-    } finally {
-      setIsSearching(false);
+      if (error || !data) {
+        setError('Code not found');
+      } else {
+        setApartment(data);
+      }
+    } catch (e) {
+      setError('Error searching');
     }
+
+    setLoading(false);
   };
 
-  // ✅ JOIN
+  // JOIN
   const handleJoin = async () => {
     if (!user || !apartment) return;
 
-    setIsSearching(true);
+    setLoading(true);
 
     try {
-      const { error } = await supabase
+      await supabase
         .from('users')
         .update({
           apartment_id: apartment.id,
@@ -56,70 +54,48 @@ export default function JoinBuilding() {
         })
         .eq('id', user.id);
 
-      if (error) throw error;
-
-      await refreshProfile();
       navigate('/dashboard');
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
       setError('Join failed');
-    } finally {
-      setIsSearching(false);
     }
+
+    setLoading(false);
   };
 
-  // ✅ IF FOUND → CONFIRM
-  if (apartment) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center space-y-6">
-          <h2 className="text-2xl font-bold">Confirm Apartment</h2>
-
-          <p className="text-gray-600">
-            Apartment Number: <strong>{apartment.number}</strong>
-          </p>
-
-          <button
-            onClick={handleJoin}
-            className="w-full bg-black text-white py-3 rounded-xl font-bold"
-          >
-            {isSearching ? 'Joining...' : 'Confirm & Join'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 🔍 SEARCH UI
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold">Join Building</h2>
-          <button onClick={() => navigate('/')}>
-            <X />
+    <div style={{ padding: 40, textAlign: 'center' }}>
+      <h2>Join Building</h2>
+
+      {/* INPUT */}
+      <input
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        placeholder="Enter code"
+        style={{ padding: 10, width: 200 }}
+      />
+
+      <br /><br />
+
+      {/* SEARCH */}
+      <button onClick={handleSearch}>
+        {loading ? 'Loading...' : 'Search'}
+      </button>
+
+      {/* ERROR */}
+      {error && (
+        <p style={{ color: 'red' }}>{error}</p>
+      )}
+
+      {/* RESULT */}
+      {apartment && (
+        <div style={{ marginTop: 20 }}>
+          <p>Apartment: {apartment?.number || 'N/A'}</p>
+
+          <button onClick={handleJoin}>
+            Confirm Join
           </button>
         </div>
-
-        <form onSubmit={handleSearch} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Enter invite code"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-            className="w-full border p-3 rounded-xl text-center"
-          />
-
-          <button className="w-full bg-black text-white py-3 rounded-xl font-bold">
-            {isSearching ? 'Searching...' : 'Search'}
-          </button>
-        </form>
-
-        {error && (
-          <div className="text-red-500 text-sm text-center">
-            {error}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
+}
