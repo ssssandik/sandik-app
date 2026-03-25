@@ -36,7 +36,7 @@ export default function JoinBuilding() {
 
       if (apartment) {
         setFoundApartment(apartment);
-        setFoundBuilding(apartment.buildings);
+        setFoundBuilding(null);
         setStep('confirm');
       } else {
         setError('Could not find an apartment with this invite code. Please check and try again.');
