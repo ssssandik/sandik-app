@@ -28,14 +28,7 @@ export default function JoinBuilding() {
     try {
       const { data: apartment, error: apartmentError } = await supabase
         .from('apartments')
-        .select(`
-  *,
-  buildings:building_id (
-    id,
-    name,
-    address
-  )
-`
+    select(', buildings()')
         .eq('invite_code', inviteCode)
         .maybeSingle();
 
