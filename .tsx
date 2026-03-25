@@ -5,7 +5,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<div>Home</div>} />
+        <Route path="/" element={<div style={{padding:40}}>Sandik Home</div>} />
         <Route path="/join-building" element={<JoinBuilding />} />
       </Routes>
     </BrowserRouter>
